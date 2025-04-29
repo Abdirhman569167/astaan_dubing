@@ -1,56 +1,94 @@
 "use client";
 
-import React, { useState } from 'react';
+import userAuth from '@/myStore/userAuth';
+import React, { useState, useEffect } from 'react';
 import { BiBell, BiCheck, BiCheckCircle, BiEnvelope, BiEnvelopeOpen, BiFilter, BiSearch, BiX } from 'react-icons/bi';
 
 interface Notification {
   id: number;
+  user_id: number;
+  user_name: string;
   message: string;
-  time: string;
-  read: boolean;
-  category: 'info' | 'success' | 'warning' | 'alert';
+  created_at: string;
+  read?: boolean;
+  category?: 'info' | 'success' | 'warning' | 'alert';
+  time?: string;
 }
 
 export default function NotificationsPage() {
   const [activeFilter, setActiveFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: 1,
-      message: "We're pleased to inform you that a new customer has registered! Please follow up promptly by contacting.",
-      time: 'Just Now',
-      read: false,
-      category: 'info'
-    },
-    {
-      id: 2,
-      message: 'Hello Sales Marketing Team, We have a special offer for our customers! Enjoy a 20% discount on selected..',
-      time: '30 mins ago',
-      read: false,
-      category: 'success'
-    },
-    {
-      id: 3,
-      message: 'Hello Sales Marketing Team, This is a reminder to achieve this month\'s sales target. Currently, we\'re...',
-      time: '2 days ago',
-      read: true,
-      category: 'warning'
-    },
-    {
-      id: 4,
-      message: 'Hello Sales Marketing Team, We\'ve received a product information request from a potential customer.',
-      time: '5 days ago',
-      read: true,
-      category: 'info'
-    },
-    {
-      id: 5,
-      message: 'Hello Sales Marketing Team, A meeting or presentation has been scheduled with a customer/prospect.',
-      time: '01 Feb, 2024',
-      read: true,
-      category: 'alert'
-    }
-  ]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const user = userAuth((state) => state.user);
+
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        setLoading(true);
+        // Use the provided API endpoint
+        const response = await fetch(`http://localhost:8005/api/notifications/user/${user?.id}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Failed to fetch notifications');
+        }
+        
+        const data = await response.json();
+        
+        // Transform the notifications to match our UI needs
+        const formattedNotifications = data.data.map((notification: Notification) => ({
+          ...notification,
+          read: false, // Set default as unread
+          category: getRandomCategory(), // Assign random category for display
+          time: formatTimeAgo(new Date(notification.created_at))
+        }));
+        
+        setNotifications(formattedNotifications);
+      } catch (err) {
+        console.error('Error fetching notifications:', err);
+        setError('Failed to load notifications');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNotifications();
+  }, []);
+
+  // Helper function to format date as time ago
+  const formatTimeAgo = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.round(diffMs / 60000);
+    const diffHours = Math.round(diffMins / 60);
+    const diffDays = Math.round(diffHours / 24);
+
+    if (diffMins < 1) return 'Just Now';
+    if (diffMins < 60) return `${diffMins} mins ago`;
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    if (diffDays < 30) return `${diffDays} days ago`;
+    
+    // Format as date if older
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  // Helper function to assign random category for display purposes
+  const getRandomCategory = (): 'info' | 'success' | 'warning' | 'alert' => {
+    const categories: ('info' | 'success' | 'warning' | 'alert')[] = ['info', 'success', 'warning', 'alert'];
+    return categories[Math.floor(Math.random() * categories.length)];
+  };
 
   const markAsRead = (id: number) => {
     setNotifications(notifications.map(item => 
@@ -159,7 +197,19 @@ export default function NotificationsPage() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          {filteredNotifications.length > 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#ff4e00]"></div>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-12 sm:py-16">
+              <div className="bg-rose-100 p-4 rounded-full mb-4">
+                <BiX className="text-rose-600" size={28} />
+              </div>
+              <h3 className="text-gray-700 font-medium mb-1">Error loading notifications</h3>
+              <p className="text-gray-500 text-sm text-center px-4">{error}</p>
+            </div>
+          ) : filteredNotifications.length > 0 ? (
             <div className="divide-y divide-gray-100">
               {filteredNotifications.map((notification) => (
                 <div 
@@ -170,18 +220,19 @@ export default function NotificationsPage() {
                     <span className="absolute top-4 sm:top-5 right-4 sm:right-5 h-2.5 w-2.5 bg-[#ff4e00] rounded-full"></span>
                   )}
                   <div className="flex-shrink-0">
-                    {getCategoryIcon(notification.category)}
+                    {getCategoryIcon(notification.category || 'info')}
                   </div>
                   <div className="min-w-0 flex-1">
+                   
                     <p className={`text-sm leading-relaxed ${notification.read ? 'text-gray-600' : 'text-gray-900 font-medium'}`}>
                       {notification.message}
                     </p>
                     <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-2">
-                      <span className={`inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryColor(notification.category)}`}>
-                        {notification.category.charAt(0).toUpperCase() + notification.category.slice(1)}
+                      <span className={`inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryColor(notification.category || 'info')}`}>
+                        {notification.category ? notification.category.charAt(0).toUpperCase() + notification.category.slice(1) : 'Info'}
                       </span>
                       <p className="text-xs text-gray-400">
-                        {notification.time}
+                        {notification.time || formatTimeAgo(new Date(notification.created_at))}
                       </p>
                     </div>
                   </div>

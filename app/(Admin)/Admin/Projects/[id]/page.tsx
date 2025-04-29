@@ -359,7 +359,7 @@ export default function ProjectDetail({ params }: { params: any }) {
   const fetchChatMessages = async (projectId: any) => {
     try {
       setLoadingChat(true);
-      const response = await axios.get(`http://localhost:8005/api/chat/${projectId}`);
+      const response = await axios.get(`http://localhost:8006/api/chat/${projectId}`);
       
       if (response.data && Array.isArray(response.data.messages)) {
         setChatMessages(response.data.messages);
@@ -400,7 +400,7 @@ export default function ProjectDetail({ params }: { params: any }) {
       }
       
       const response = await axios.post(
-        "http://localhost:8005/api/chat/send",
+        "http://localhost:8006/api/chat/send",
         formData,
         {
           headers: {

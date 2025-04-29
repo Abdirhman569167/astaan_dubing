@@ -128,19 +128,12 @@ const userRoles = [
                 <span className={`inline-block px-3 py-1 text-sm rounded-full ${getRoleColor(user.role)}`}>
                   {user.role}
                 </span>
-                <span className={`inline-block px-3 py-1 text-sm rounded-full ${getStatusColor(user.status)}`}>
-                  {user.status}
-                </span>
               </div>
             </div>
             
             <div className="flex-1">
               <div className="border-b border-gray-200 pb-4 mb-5">
                 <h3 className="text-2xl font-semibold mb-1">{user.name}</h3>
-                <p className="text-gray-500 flex items-center">
-                  <span className="inline-block w-6 h-6 bg-gray-100 rounded-full text-center text-xs mr-2">ID</span>
-                  {user.id}
-                </p>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -995,13 +988,9 @@ export default function UsersPage() {
                                   {initials}
                                 </div>
                               )}
-                              <span className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white ${
-                                user.status === 'Active' ? 'bg-green-500' : 'bg-gray-300'
-                              }`}></span>
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                              <div className="text-xs text-gray-500 mt-0.5">ID: {user.id}</div>
                             </div>
                           </div>
                         </td>
@@ -1025,9 +1014,6 @@ export default function UsersPage() {
                           <div className="flex flex-col gap-2">
                             <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getRoleColor(user.role)}`}>
                               {user.role}
-                            </span>
-                            <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(user.status)}`}>
-                              {user.status}
                             </span>
                           </div>
                         </td>
