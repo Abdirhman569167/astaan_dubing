@@ -22,8 +22,7 @@ export default function NotificationsPage() {
     const fetchNotifications = async () => {
       try {
         setLoading(true);
-        // Use relative URL to avoid CORS issues
-        const response = await fetch('/api/notifications/all', {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_NOTIFICATION_SERVICE_URL}/api/notifications/all`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -54,7 +53,6 @@ export default function NotificationsPage() {
     fetchNotifications();
   }, []);
 
-  // Helper function to format date as time ago
   const formatTimeAgo = (date: Date) => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();

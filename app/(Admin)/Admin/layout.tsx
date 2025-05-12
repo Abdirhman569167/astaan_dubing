@@ -105,7 +105,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
-      <header className={`bg-white shadow-sm border-b border-gray-100 fixed top-0 right-0 z-20 transition-all duration-300 ${
+      <header className={`bg-white shadow-sm border-b border-gray-100 fixed top-0 right-0 z-20 transition-all duration-300 rounded-bl-3xl ${
         isMobile ? 'left-0' : sidebarOpen ? 'left-[260px]' : 'left-[74px]'
       }`}>
         <div className="flex items-center justify-between h-16 px-4 md:px-6">
@@ -125,7 +125,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           <div className="flex items-center space-x-4">
             <div className="relative" ref={dropdownRef}>
               <button
-                className="flex items-center gap-3 px-2 py-1 rounded-lg hover:bg-[#fff1ec] transition-all"
+                className="flex items-center gap-3 px-3 py-1.5 rounded-full hover:bg-[#fff1ec] transition-all border border-gray-100 shadow-sm"
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               >
                 <div className="relative h-8 w-8 rounded-full border-2 border-[#ff4e00]/20 overflow-hidden flex items-center justify-center">

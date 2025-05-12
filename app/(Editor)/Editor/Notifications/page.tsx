@@ -29,7 +29,7 @@ export default function NotificationsPage() {
       try {
         setLoading(true);
         // Use the provided API endpoint
-        const response = await fetch(`http://localhost:8005/api/notifications/user/${user?.id}`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_NOTIFICATION_SERVICE_URL}/api/notifications/user/${user?.id}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',

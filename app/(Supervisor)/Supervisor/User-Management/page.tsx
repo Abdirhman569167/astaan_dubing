@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import axios from "axios";
 import toast from "react-hot-toast";
 import LoadingReuse from "@/components/LoadingReuse";
 import { FiEdit, FiEye, FiX, FiUpload, FiTrash2, FiAlertTriangle } from "react-icons/fi";
+import Authentication from "@/service/Authentication";
 
 const userRoles = [
   "User",
@@ -128,22 +128,23 @@ const userRoles = [
                 <span className={`inline-block px-3 py-1 text-sm rounded-full ${getRoleColor(user.role)}`}>
                   {user.role}
                 </span>
-                <span className={`inline-block px-3 py-1 text-sm rounded-full ${getStatusColor(user.status)}`}>
-                  {user.status}
-                </span>
               </div>
             </div>
             
             <div className="flex-1">
               <div className="border-b border-gray-200 pb-4 mb-5">
                 <h3 className="text-2xl font-semibold mb-1">{user.name}</h3>
-                <p className="text-gray-500 flex items-center">
-                  <span className="inline-block w-6 h-6 bg-gray-100 rounded-full text-center text-xs mr-2">ID</span>
-                  {user.id}
-                </p>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="border-b border-gray-100 pb-3">
+                  <p className="text-sm text-gray-500 font-medium mb-1">Employee ID</p>
+                  <p className="font-medium flex items-center">
+                    <span className="mr-2 text-[#ff4e00]">🆔</span>
+                    {user.employee_id || "—"}
+                  </p>
+                </div>
+                
                 <div className="border-b border-gray-100 pb-3">
                   <p className="text-sm text-gray-500 font-medium mb-1">Email</p>
                   <p className="font-medium flex items-center">
@@ -217,13 +218,14 @@ export default function UsersPage() {
   const getUsers = async () => {
     try {
       setLoadingUsers(true);
-      const response = await axios.get(`${userService}/api/auth/users`);
+      const response = await Authentication.getUsers();
       if (response.status === 200) {
         setUserList(response.data.users.map((user: any) => ({
           id: user.id,
           name: user.name,
           email: user.email,
           phone: user.mobile || "N/A",
+          employee_id: user.employee_id || "",
           role: user.role,
           status: "Active",  
           avatar: user.profile_image,
@@ -251,7 +253,8 @@ export default function UsersPage() {
   const filteredUsers = userList.filter((user: any) => {
     const matchesSearch =
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase());
+      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (user.employee_id && user.employee_id.toLowerCase().includes(searchQuery.toLowerCase()));
 
     let matchesTab = true;
     if (selectedTab !== "all") {
@@ -307,8 +310,7 @@ export default function UsersPage() {
   const handleDeleteUser = async (userId: number) => {
     try {
       setIsDeleting(true);
-      const userService = process.env.NEXT_PUBLIC_USER_SERVICE_URL;
-      const response = await axios.delete(`${userService}/api/auth/users/${userId}`);
+      const response = await Authentication.deleteUser(userId);
       
       if (response.status === 200) {
         toast.success(response.data.message || "User deleted successfully");
@@ -332,6 +334,7 @@ export default function UsersPage() {
     const [name, setName] = useState(user.name);
     const [email, setEmail] = useState(user.email);
     const [phone, setPhone] = useState(user.phone);
+    const [employeeId, setEmployeeId] = useState(user.employee_id || "");
     const [role, setRole] = useState(user.role);
     const [previewImage, setPreviewImage] = useState(user.avatar);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -371,21 +374,14 @@ export default function UsersPage() {
         if(email) formData.append('email', email);
   
         if(phone) formData.append('mobile', phone);
+        
+        if(employeeId) formData.append('employee_id', employeeId);
   
         if(role) formData.append('role', role);
         
         if(selectedFile) formData.append('profileImage', selectedFile);
   
-        const userService = process.env.NEXT_PUBLIC_USER_SERVICE_URL;
-        const response = await axios.put(
-          `${userService}/api/auth/users/${user.id}`, 
-          formData, 
-          {
-            headers: {
-              'Content-Type': 'multipart/form-data'
-            }
-          }
-        );
+        const response = await Authentication.updateUser(user.id, formData);
         
         if (response.status === 200) {
           toast.success(response.data.message);
@@ -491,6 +487,18 @@ export default function UsersPage() {
                   </div>
                   
                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
+                    <input
+                      type="text"
+                      name="employee_id"
+                      value={employeeId}
+                      onChange={(e) => setEmployeeId(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2"
+                      placeholder="Enter employee ID"
+                    />
+                  </div>
+                  
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
                     <input
                       type="text"
@@ -559,6 +567,7 @@ export default function UsersPage() {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
+    const [employeeId, setEmployeeId] = useState("");
     const [role, setRole] = useState("User");
     const [password, setPassword] = useState("");
     const [previewImage, setPreviewImage] = useState("");
@@ -596,7 +605,7 @@ export default function UsersPage() {
         return;
       }
       
-       const trimmedPhone = phone.trim();
+      const trimmedPhone = phone.trim();
       
       try {
         setLoading(true);
@@ -606,22 +615,14 @@ export default function UsersPage() {
         formData.append('name', name);
         formData.append('email', email);
         formData.append('mobile', trimmedPhone);
+        if (employeeId) formData.append('employee_id', employeeId);
         formData.append('role', role);
         formData.append('password', password);
         if(selectedFile) formData.append('profileImage', selectedFile);
 
-        const userService = process.env.NEXT_PUBLIC_USER_SERVICE_URL;
-        const response = await axios.post(
-          `${userService}/api/auth/register`, 
-          formData, 
-          {
-            headers: {
-              'Content-Type': 'multipart/form-data'
-            }
-          }
-        );
+        const response = await Authentication.createUser(formData);
         
-         if (response.status === 201 || (response.data && response.data.success)) {
+        if (response.status === 201 || (response.data && response.data.success)) {
           toast.success(response.data.message || "User created successfully");
           getUsers();
           onClose();
@@ -723,6 +724,18 @@ export default function UsersPage() {
                 </div>
                 
                 <div className="flex-1 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
+                    <input
+                      type="text"
+                      name="employee_id"
+                      value={employeeId}
+                      onChange={(e) => setEmployeeId(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2"
+                      placeholder="Enter employee ID"
+                    />
+                  </div>
+                  
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
                     <input
@@ -848,191 +861,244 @@ export default function UsersPage() {
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold mb-2 text-gray-800">Users</h1>
-            <p className="text-gray-600">Manage and view all users in the system</p>
+            <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
+            <p className="text-gray-500 mt-2">Manage system users, roles, and permissions</p>
           </div>
           <button
-            className="mt-4 sm:mt-0 bg-[#ff4e00] hover:bg-[#ff4e00]/90 text-white flex items-center gap-2 px-5 py-2.5 rounded-md font-medium transition-all shadow-sm"
+            className="inline-flex items-center px-4 py-2.5 bg-[#ff4e00] hover:bg-[#ff4e00]/90 text-white rounded-lg font-medium transition-all shadow-sm"
             onClick={handleAddNewUser}
           >
-            <span>Add New User</span>
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Add New User
           </button>
         </div>
 
-        <div className="bg-white p-5 rounded-xl mb-6 shadow-sm border border-gray-100">
-          <div className="grid grid-cols-1 gap-4">
-            <div className="flex items-center gap-3">
+        {/* Search and Filter Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+          <div className="p-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex-grow">
                 <label className="text-sm font-medium text-gray-700 mb-1.5 block">Search Users</label>
-                <input
-                  type="text"
-                  placeholder="Search users by name or email..."
-                  className="pl-4 pr-4 py-2.5 w-full border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#ff4e00] focus:border-transparent transition-all"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search by name, email, or role..."
+                    className="pl-10 pr-4 py-2.5 w-full border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff4e00] focus:border-transparent transition-all"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
               </div>
-              <div className="mt-7">
+              <div className="flex items-end">
                 <button
-                  className="border border-gray-200 rounded-md px-4 py-2.5 hover:bg-gray-50 transition-colors text-gray-700"
+                  className="px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-600 font-medium flex items-center"
                   onClick={() => {
                     setSelectedRole("all");
                     setSearchQuery("");
                     setSelectedTab("all");
                   }}
                 >
-                  Reset
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Reset Filters
                 </button>
               </div>
             </div>
           </div>
+
+          {/* Role Tabs */}
+          <div className="border-t border-gray-100">
+            <div className="flex overflow-x-auto p-1.5 gap-2">
+              <button
+                className={`px-4 py-2 rounded-lg transition-all whitespace-nowrap ${
+                  selectedTab === 'all' 
+                    ? 'bg-[#ff4e00]/10 text-[#ff4e00] font-medium' 
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+                onClick={() => setSelectedTab("all")}
+              >
+                All Users
+              </button>
+              {userRoles.map(role => {
+                const tabValue = role.toLowerCase().replace(/\s+/g, '-');
+                const displayText = role + 's';
+                
+                return (
+                  <button
+                    key={role}
+                    className={`px-4 py-2 rounded-lg transition-all whitespace-nowrap ${
+                      selectedTab === tabValue 
+                        ? 'bg-[#ff4e00]/10 text-[#ff4e00] font-medium' 
+                        : 'text-gray-600 hover:bg-gray-50'
+                    }`}
+                    onClick={() => setSelectedTab(tabValue)}
+                  >
+                    {displayText}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        <div className="mb-8">
-          <div className="flex overflow-x-auto space-x-2 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100">
-            <button
-              className={`px-4 py-2.5 rounded-md transition-all ${selectedTab === 'all' ? 'bg-gray-100 shadow-sm font-medium text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}
-              onClick={() => setSelectedTab("all")}
-            >
-              All Users
-            </button>
-            {userRoles.map(role => {
-              const tabValue = role.toLowerCase().replace(/\s+/g, '-');
-              const displayText = role + 's';
-              
-              return (
-                <button
-                  key={role}
-                  className={`px-4 py-2.5 rounded-md whitespace-nowrap transition-all ${selectedTab === tabValue ? 'bg-gray-100 shadow-sm font-medium text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}
-                  onClick={() => setSelectedTab(tabValue)}
-                >
-                  {displayText}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-6">
-            {loadingUsers ? (
-              <div className="flex items-center justify-center py-12">
-                <LoadingReuse />
+        {/* Users List */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          {loadingUsers ? (
+            <div className="flex items-center justify-center py-12">
+              <LoadingReuse />
+            </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="mx-auto h-20 w-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                <svg className="h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
               </div>
-            ) : filteredUsers.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-xl border border-gray-100 shadow-sm">
-                <div className="mx-auto h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-1">No users found</h3>
-                <p className="text-gray-500 mb-4">Try adjusting your search or filter criteria</p>
-                <button 
-                  onClick={() => {
-                    setSelectedRole("all");
-                    setSearchQuery("");
-                    setSelectedTab("all");
-                  }}
-                  className="text-[#ff4e00] font-medium hover:underline"
-                >
-                  Clear filters
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredUsers.map((user: any) => {
-                  const hasAvatar = user.avatar && user.avatar !== "null" && user.avatar !== "undefined";
-                  const bgColor = stringToColor(user.name);
-                  const initials = getInitials(user.name);
-                  
-                  return (
-                    <div
-                      key={user.id}
-                      className="bg-white overflow-hidden border border-gray-100 hover:border-[#ff4e00]/30 transition-all shadow-sm hover:shadow rounded-xl"
-                    >
-                      <div className="p-6 flex flex-col items-center text-center">
-                        <div className="relative">
-                          <div className="h-20 w-20 relative rounded-full overflow-hidden border-2 border-white shadow mb-3 bg-white">
-                            {hasAvatar ? (
-                              <img
-                                src={user.avatar}
-                                alt={user.name}
-                                className="object-cover w-full h-full"
-                                onError={(e) => {
-                                   const target = e.target as HTMLImageElement;
-                                  target.style.display = "none";
-                                  target.parentElement!.style.backgroundColor = bgColor;
-                                  target.parentElement!.innerHTML += `<div class="flex items-center justify-center w-full h-full text-white text-xl font-semibold">${initials}</div>`;
-                                }}
-                              />
-                            ) : (
-                              <div 
-                                className="flex items-center justify-center w-full h-full text-white text-xl font-semibold" 
-                                style={{ backgroundColor: bgColor }}
-                              >
-                                {initials}
-                              </div>
-                            )}
+              <h3 className="text-lg font-medium text-gray-900 mb-1">No users found</h3>
+              <p className="text-gray-500 mb-4">Try adjusting your search or filter criteria</p>
+              <button 
+                onClick={() => {
+                  setSelectedRole("all");
+                  setSearchQuery("");
+                  setSelectedTab("all");
+                }}
+                className="text-[#ff4e00] font-medium hover:text-[#ff4e00]/80 transition-colors"
+              >
+                Clear all filters
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      User Details
+                    </th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Contact Info
+                    </th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Role
+                    </th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Employee ID
+                    </th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Joined Date
+                    </th>
+                    <th scope="col" className="px-6 py-4 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredUsers.map((user) => {
+                    const hasAvatar = user.avatar && user.avatar !== "null" && user.avatar !== "undefined";
+                    const bgColor = stringToColor(user.name);
+                    const initials = getInitials(user.name);
+                    
+                    return (
+                      <tr key={user.id} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10 relative">
+                              {hasAvatar ? (
+                                <img
+                                  src={user.avatar}
+                                  alt={user.name}
+                                  className="h-10 w-10 rounded-full object-cover ring-2 ring-white"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = "none";
+                                    target.parentElement!.innerHTML = `<div class="h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-medium ring-2 ring-white" style="background-color: ${bgColor}">${initials}</div>`;
+                                  }}
+                                />
+                              ) : (
+                                <div 
+                                  className="h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-medium ring-2 ring-white" 
+                                  style={{ backgroundColor: bgColor }}
+                                >
+                                  {initials}
+                                </div>
+                              )}
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                            </div>
                           </div>
-                          <span
-                            title={user.status}
-                            className={`absolute bottom-3 right-0 h-4 w-4 rounded-full border-2 border-white ${
-                              user.status === 'Active' ? 'bg-green-500' : 'bg-gray-300'
-                            }`}
-                          ></span>
-                        </div>
-
-                        <h3 className="font-medium text-gray-900 mb-0.5">{user.name}</h3>
-                        <span className={`inline-block px-2 py-0.5 text-xs rounded-full mb-3 ${getRoleColor(user.role)}`}>
-                          {user.role}
-                        </span>
-
-                        <div className="w-full space-y-2 mb-4 text-sm text-gray-600">
-                          <div className="flex items-center justify-center gap-1.5 overflow-hidden text-ellipsis">
-                            <span className="text-gray-400">📧</span>
-                            <span className="truncate max-w-[180px]" title={user.email}>{user.email}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm">
+                            <div className="flex items-center text-gray-900">
+                              <svg className="w-4 h-4 text-gray-400 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                              {user.email}
+                            </div>
+                            <div className="flex items-center text-gray-500 mt-1">
+                              <svg className="w-4 h-4 text-gray-400 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                              </svg>
+                              {user.phone}
+                            </div>
                           </div>
-                          <div className="flex items-center justify-center gap-1.5">
-                            <span className="text-gray-400">📞</span>
-                            <span>{user.phone}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getRoleColor(user.role)}`}>
+                            {user.role}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">{user.employee_id || "—"}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">{user.joinDate}</div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex justify-center gap-2">
+                            <button 
+                              onClick={() => handleViewUser(user.id)}
+                              className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                              title="View Details"
+                            >
+                              <FiEye size={18} />
+                            </button>
+                            <button 
+                              onClick={() => handleEditUser(user.id)}
+                              className="p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
+                              title="Edit User"
+                            >
+                              <FiEdit size={18} />
+                            </button>
+                            <button 
+                              onClick={() => setDeleteConfirmUser(user)}
+                              className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                              title="Delete User"
+                            >
+                              <FiTrash2 size={18} />
+                            </button>
                           </div>
-                          <div className="text-xs text-gray-400 mt-1">Joined: {user.joinDate}</div>
-                        </div>
-                        
-                        <div className="flex justify-center gap-3">
-                          <button 
-                            onClick={() => handleViewUser(user.id)}
-                            className="w-9 h-9 flex items-center justify-center rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                            title="View Details"
-                          >
-                            <FiEye size={18} />
-                          </button>
-                          <button 
-                            onClick={() => handleEditUser(user.id)}
-                            className="w-9 h-9 flex items-center justify-center rounded-full bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
-                            title="Edit User"
-                          >
-                            <FiEdit size={18} />
-                          </button>
-                          <button 
-                            onClick={() => setDeleteConfirmUser(user)}
-                            className="w-9 h-9 flex items-center justify-center rounded-full bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                            title="Delete User"
-                          >
-                            <FiTrash2 size={18} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
       
+      {/* Keep existing modals */}
       {viewingUser && (
         <UserDetailModal 
           user={viewingUser} 

@@ -12,9 +12,11 @@ import {
   FiInfo,
   FiAlertTriangle,
   FiCalendar,
+  FiLayers,
 } from 'react-icons/fi';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
+import UserRangs from '@/components/UserRangs';
 
 // Register ChartJS components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -35,12 +37,16 @@ export default function AdminDashboard() {
     todoTasks: 0,
     inProgressTasks: 0,
     reviewTasks: 0,
+    totalTasks: 0,
+    totalProjects: 0,
     weeklyChanges: {
       users: 0,
       completed: 0,
       todo: 0,
       inProgress: 0,
-      review: 0
+      review: 0,
+      total: 0,
+      projects: 0
     }
   });
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -55,9 +61,9 @@ export default function AdminDashboard() {
   const [newNotificationsCount, setNewNotificationsCount] = useState(0);
 
   // Update API endpoints to match what you've provided
-  const userServiceUrl = 'http://localhost:8001';
-  const projectServiceUrl = 'http://localhost:8002';
-  const taskServiceUrl = 'http://localhost:8003';
+  const userServiceUrl = process.env.NEXT_PUBLIC_USER_SERVICE_URL;
+  const projectServiceUrl = process.env.NEXT_PUBLIC_PROJECT_SERVICE_URL;
+  const taskServiceUrl = process.env.NEXT_PUBLIC_TASK_SERVICE_URL;
 
   // Helper function to safely format dates and handle invalid dates
   const formatDate = (dateStr: string | undefined | null) => {
@@ -105,6 +111,7 @@ export default function AdminDashboard() {
         const todoTasks = tasks.filter((t: any) => t.status === 'To Do').length || 0;
         const inProgressTasks = tasks.filter((t: any) => t.status === 'In Progress').length || 0;
         const reviewTasks = tasks.filter((t: any) => t.status === 'Review').length || 0;
+        const totalTasks = tasks.length || 0;
         
         // Calculate weekly changes (example implementation - replace with real calculation)
         const weeklyChanges = {
@@ -112,7 +119,9 @@ export default function AdminDashboard() {
           completed: 23,
           todo: -2,
           inProgress: -3,
-          review: 0
+          review: 0,
+          total: 18,
+          projects: 5
         };
 
         setStats({
@@ -121,6 +130,8 @@ export default function AdminDashboard() {
           todoTasks,
           inProgressTasks,
           reviewTasks,
+          totalTasks,
+          totalProjects: projects.length || 0,
           weeklyChanges
         });
 
@@ -390,7 +401,7 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-6 mb-8">
           {/* Total Users */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex justify-between items-start">
@@ -398,7 +409,6 @@ export default function AdminDashboard() {
                 <h3 className="text-gray-500 text-sm font-medium">Total Users</h3>
                 <p className="text-3xl font-bold mt-2">{stats.totalUsers}</p>
                 <p className={`text-sm mt-2 ${getChangeColor(stats.weeklyChanges.users)}`}>
-                  {stats.weeklyChanges.users > 0 ? '+' : ''}{stats.weeklyChanges.users} this week
                 </p>
               </div>
               <div className="bg-blue-100 p-3 rounded-full">
@@ -407,194 +417,39 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* To Do Tasks */}
+          {/* Total Projects */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-gray-500 text-sm font-medium">To Do Tasks</h3>
-                <p className="text-3xl font-bold mt-2">{stats.todoTasks}</p>
-                <p className={`text-sm mt-2 ${getChangeColor(stats.weeklyChanges.todo)}`}>
-                  {stats.weeklyChanges.todo > 0 ? '+' : ''}{stats.weeklyChanges.todo} this week
+                <h3 className="text-gray-500 text-sm font-medium">Total Projects</h3>
+                <p className="text-3xl font-bold mt-2">{stats.totalProjects}</p>
+                <p className={`text-sm mt-2 ${getChangeColor(stats.weeklyChanges.projects)}`}>
                 </p>
               </div>
-              <div className="bg-gray-100 p-3 rounded-full">
-                <FiClock className="h-6 w-6 text-gray-600" />
+              <div className="bg-indigo-100 p-3 rounded-full">
+                <FiLayers className="h-6 w-6 text-indigo-600" />
               </div>
             </div>
           </div>
 
-          {/* In Progress Tasks */}
+          {/* Total Tasks */}
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-gray-500 text-sm font-medium">In Progress Tasks</h3>
-                <p className="text-3xl font-bold mt-2">{stats.inProgressTasks}</p>
-                <p className={`text-sm mt-2 ${getChangeColor(stats.weeklyChanges.inProgress)}`}>
-                  {stats.weeklyChanges.inProgress > 0 ? '+' : ''}{stats.weeklyChanges.inProgress} this week
+                <h3 className="text-gray-500 text-sm font-medium">Total Tasks</h3>
+                <p className="text-3xl font-bold mt-2">{stats.totalTasks}</p>
+                <p className={`text-sm mt-2 ${getChangeColor(stats.weeklyChanges.total)}`}>
                 </p>
               </div>
-              <div className="bg-blue-100 p-3 rounded-full">
-                <FiClock className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-          </div>
-
-          {/* Review Tasks */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-gray-500 text-sm font-medium">Under Review Tasks</h3>
-                <p className="text-3xl font-bold mt-2">{stats.reviewTasks}</p>
-                <p className={`text-sm mt-2 ${getChangeColor(stats.weeklyChanges.review)}`}>
-                  {stats.weeklyChanges.review > 0 ? '+' : ''}{stats.weeklyChanges.review} this week
-                </p>
-              </div>
-              <div className="bg-yellow-100 p-3 rounded-full">
-                <FiAlertCircle className="h-6 w-6 text-yellow-600" />
-              </div>
-            </div>
-          </div>
-
-          {/* Completed Tasks */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-gray-500 text-sm font-medium">Completed Tasks</h3>
-                <p className="text-3xl font-bold mt-2">{stats.completedTasks}</p>
-                <p className={`text-sm mt-2 ${getChangeColor(stats.weeklyChanges.completed)}`}>
-                  {stats.weeklyChanges.completed > 0 ? '+' : ''}{stats.weeklyChanges.completed} this week
-                </p>
-              </div>
-              <div className="bg-green-100 p-3 rounded-full">
-                <FiCheckCircle className="h-6 w-6 text-green-600" />
+              <div className="bg-purple-100 p-3 rounded-full">
+                <FiCalendar className="h-6 w-6 text-purple-600" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Task Performance and Notifications Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Task Performance Chart */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-900">Task Performance</h2>
-            
-            <div className="flex items-center my-4">
-              <div className="flex items-center mr-4">
-                <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
-                <span className="text-sm text-gray-600">Completed</span>
-              </div>
-              <div className="flex items-center mr-4">
-                <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
-                <span className="text-sm text-gray-600">Pending</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
-                <span className="text-sm text-gray-600">Overdue</span>
-              </div>
-            </div>
-            
-            <div className="mt-8">
-              <Bar data={chartData} options={chartOptions} />
-            </div>
-          </div>
+        <UserRangs />
 
-          {/* Notifications */}
-          <div className="bg-white rounded-xl shadow-sm">
-            <div className="p-6 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <h2 className="text-xl font-semibold text-gray-900">Notifications Update</h2>
-                <span className="bg-red-500 text-white text-xs font-medium px-2 py-0.5 rounded-full">
-                  {newNotificationsCount} new
-                </span>
-              </div>
-              <FiBell className="h-6 w-6 text-gray-400" />
-            </div>
-            
-            <div>
-              {/* New Project Update */}
-              {recentProjects.length > 0 && (
-                <div className="px-6 py-4 border-t border-gray-100 flex items-start bg-green-50">
-                  <div className="flex-shrink-0 mt-1 mr-4">
-                    <FiCheckCircle className="h-5 w-5 text-green-500" />
-                  </div>
-                  <div className="flex-grow">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-gray-900">New Project Update</p>
-                      <p className="text-xs text-gray-500">Just now</p>
-                    </div>
-                    <p className="text-sm text-gray-500 mt-1">
-                      The project "{recentProjects[0]?.name || 'New Project'}" has been created
-                    </p>
-                  </div>
-                </div>
-              )}
-              
-              {/* Deadline Approaching */}
-              <div className="px-6 py-4 border-t border-gray-100 flex items-start bg-amber-50">
-                <div className="flex-shrink-0 mt-1 mr-4">
-                  <FiAlertTriangle className="h-5 w-5 text-amber-500" />
-                </div>
-                <div className="flex-grow">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-900">Deadline Approaching</p>
-                    <p className="text-xs text-gray-500">5 minutes ago</p>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {recentTasks.length > 0 
-                      ? `"${recentTasks[0]?.title}" deadline in ${recentTasks[0]?.deadline ? Math.max(1, Math.ceil((new Date(recentTasks[0]?.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 2} days`
-                      : "VFX rendering deadline in 2 days"}
-                  </p>
-                </div>
-              </div>
-              
-              {/* New Comment */}
-              <div className="px-6 py-4 border-t border-gray-100 flex items-start">
-                <div className="flex-shrink-0 mt-1 mr-4">
-                  <FiMessageSquare className="h-5 w-5 text-purple-500" />
-                </div>
-                <div className="flex-grow">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-900">New Comment</p>
-                    <p className="text-xs text-gray-500">1 hour ago</p>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {recentTasks.length > 1 
-                      ? `New comment on "${recentTasks[1]?.title}"`
-                      : "Director left feedback on the latest cut"}
-                  </p>
-                </div>
-              </div>
-              
-              {/* System Update */}
-              <div className="px-6 py-4 border-t border-gray-100 flex items-start">
-                <div className="flex-shrink-0 mt-1 mr-4">
-                  <FiInfo className="h-5 w-5 text-blue-500" />
-                </div>
-                <div className="flex-grow">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-900">System Update</p>
-                    <p className="text-xs text-gray-500">2 hours ago</p>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1">New rendering farm capacity available</p>
-                </div>
-              </div>
-              
-              {/* Resource Alert */}
-              <div className="px-6 py-4 border-t border-gray-100 flex items-start bg-amber-50">
-                <div className="flex-shrink-0 mt-1 mr-4">
-                  <FiAlertTriangle className="h-5 w-5 text-amber-500" />
-                </div>
-                <div className="flex-grow">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-900">Resource Alert</p>
-                    <p className="text-xs text-gray-500">3 hours ago</p>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1">Storage space running low - 85% used</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

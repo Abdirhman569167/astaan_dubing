@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { format } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import {
   Select,
   SelectContent,
@@ -27,8 +28,28 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Users, ListTodo, Timer, Eye, CheckCircle, BarChart2, ExternalLink, PieChart, TrendingUp, ClipboardCheck } from 'lucide-react';
+import { 
+  Search, 
+  Users, 
+  ListTodo, 
+  Timer, 
+  Eye, 
+  CheckCircle, 
+  BarChart2, 
+  ExternalLink, 
+  PieChart, 
+  TrendingUp, 
+  ClipboardCheck, 
+  Download, 
+  Calendar, 
+  Edit,
+  Save,
+  X,
+  DollarSign,
+  Check
+} from 'lucide-react';
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 interface TaskStatusUpdate {
   id: number;
@@ -51,19 +72,20 @@ interface TaskStatusUpdate {
 
 interface User {
   id: number;
-  username: string;
+  name: string;
+  email: string;
+  mobile: string;
+  role: string;
   profile_image: string;
+  created_at: string;
 }
 
 interface UserWithStats extends User {
-  completedTasks: number;
+  experienceLevel: string;
   totalHours: number;
-  averageHours: number;
-  rank: number;
-  lastUpdated: string;
-  inProgressTasks: number;
-  todoTasks: number;
-  reviewTasks: number;
+  hourlyRate: number;
+  monthlyCommission: number;
+  accountNumber: number;
 }
 
 export default function ReportsAnalyticsPage() {
@@ -76,6 +98,32 @@ export default function ReportsAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState<string>("current");
+  const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [editingRate, setEditingRate] = useState<number>(0);
+  const [customRates, setCustomRates] = useState<Map<number, number>>(new Map());
+
+  // Generate months options for the current year
+  const getMonthOptions = () => {
+    const options = [];
+    
+    // Use 2025 as the hard-coded current year to match the image
+    const currentYear = 2025;
+    
+    options.push({ value: "current", label: "Current Month" });
+    
+    // Add all months of the current year in descending order (December to January)
+    for (let month = 11; month >= 0; month--) {
+      const monthDate = new Date(currentYear, month, 1);
+      const monthValue = format(monthDate, "yyyy-MM");
+      const monthLabel = format(monthDate, "MMMM yyyy");
+      options.push({ value: monthValue, label: monthLabel });
+    }
+    
+    return options;
+  };
+
+  const monthOptions = getMonthOptions();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -99,7 +147,7 @@ export default function ReportsAnalyticsPage() {
         
         // Keep only the latest status update for each task
         const uniqueTaskUpdates = taskUpdatesArray.filter((update: any) => {
-          const taskKey = `${update.task_id}-${update.assigned_user}`;
+          const taskKey = `${update.task_id}-${update.updated_by}`;
           if (!taskUpdatesMap.has(taskKey)) {
             taskUpdatesMap.set(taskKey, true);
             return true;
@@ -107,20 +155,16 @@ export default function ReportsAnalyticsPage() {
           return false;
         });
 
-        setTaskUpdates(uniqueTaskUpdates);
-
-        const uniqueUsers = new Map();
-        uniqueTaskUpdates.forEach((task: TaskStatusUpdate) => {
-          if (!uniqueUsers.has(task.assigned_user)) {
-            uniqueUsers.set(task.assigned_user, {
-              id: task.updated_by,
-              username: task.assigned_user,
-              profile_image: task.profile_image,
-            });
-          }
-        });
+        // Further filter to only keep tasks with "Completed" status
+        const completedTasks = uniqueTaskUpdates.filter((task: TaskStatusUpdate) => task["SubTask.status"] === "Completed");
         
-        setUsers(Array.from(uniqueUsers.values()));
+        setTaskUpdates(completedTasks);
+
+        // Process users data
+        if (usersData && usersData.users) {
+          setUsers(usersData.users);
+        }
+        
         setLoading(false);
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -129,71 +173,169 @@ export default function ReportsAnalyticsPage() {
     };
 
     fetchData();
-  }, []);
+  }, [taskServiceUrl, userServiceUrl]);
 
-   const filteredUserStats = users
-    .map((user) => {
-      const userTasks = taskUpdates.filter(
-        (task) => task.assigned_user === user.username
-      );
+  // Filter tasks by selected month
+  const getTasksForSelectedMonth = () => {
+    if (selectedMonth === "current") {
+      return taskUpdates;
+    }
+    
+    const [year, month] = selectedMonth.split("-").map(Number);
+    const startDate = startOfMonth(new Date(year, month - 1));
+    const endDate = endOfMonth(new Date(year, month - 1));
+    
+    return taskUpdates.filter((task: TaskStatusUpdate) => {
+      const taskDate = new Date(task.updated_at);
+      return isWithinInterval(taskDate, { start: startDate, end: endDate });
+    });
+  };
 
-      const completedTasks = userTasks.filter(
-        (task) => task.status === "Completed"
-      );
+  const filteredTasksByMonth = getTasksForSelectedMonth();
+  
+  // Get all users who have completed tasks in the selected month
+  const usersWithCompletedTasks = users.filter(user => {
+    return filteredTasksByMonth.some((task: TaskStatusUpdate) => task.updated_by === user.id);
+  });
 
-      const inProgressTasks = userTasks.filter(
-        (task) => task.status === "In Progress"
-      ).length;
+  // Function to get base rate for a role
+  const getBaseRateForRole = (role: string): number => {
+    switch (role) {
+      case "Sound Engineer":
+        return 6.00;
+      case "Voice-over Artist":
+        return 5.00;
+      case "Translator":
+        return 8.00;
+      case "Admin":
+        return 10.00;
+      case "Film Dubbing Team":
+        return 7.00;
+      default:
+        return 5.00; // Default rate
+    }
+  };
 
-      const todoTasks = userTasks.filter(
-        (task) => task.status === "To Do"
-      ).length;
+  // Function to get custom rate for a user (or default if not set)
+  const getRateForUser = (userId: number, role: string): number => {
+    return customRates.has(userId) ? customRates.get(userId)! : getBaseRateForRole(role);
+  };
 
-      const reviewTasks = userTasks.filter(
-        (task) => task.status === "Review"
-      ).length;
+  // Start editing a user's rate
+  const startEditingRate = (userId: number, currentRate: number) => {
+    setEditingUserId(userId);
+    setEditingRate(currentRate);
+  };
 
-      return {
-        ...user,
-        completedTasks: completedTasks.length,
-        inProgressTasks,
-        todoTasks,
-        reviewTasks,
-      };
-    })
-    .filter((user) => {
-       const matchesSearch = searchQuery === "" || 
-        user.username.toLowerCase().includes(searchQuery.toLowerCase());
+  // Save the edited rate
+  const saveRate = (userId: number) => {
+    if (editingRate > 0) {
+      setCustomRates(new Map(customRates.set(userId, editingRate)));
+    }
+    setEditingUserId(null);
+  };
 
-       let matchesStatus = true;
-      if (selectedStatus !== "all") {
-        switch (selectedStatus) {
-          case "To Do":
-            matchesStatus = user.todoTasks > 0;
-            break;
-          case "In Progress":
-            matchesStatus = user.inProgressTasks > 0;
-            break;
-          case "Review":
-            matchesStatus = user.reviewTasks > 0;
-            break;
-          case "Completed":
-            matchesStatus = user.completedTasks > 0;
-            break;
-        }
-      }
+  // Cancel rate editing
+  const cancelEditing = () => {
+    setEditingUserId(null);
+  };
 
+  // Calculate user stats including work hours and earnings
+  const usersWithStats = usersWithCompletedTasks.map(user => {
+    // Get all tasks for this user in the selected month
+    const userCompletedTasks = filteredTasksByMonth.filter(
+      task => task.updated_by === user.id
+    );
+    
+    // Calculate total hours from estimated_hours
+    const totalHours = userCompletedTasks.reduce(
+      (sum, task) => sum + (task["SubTask.estimated_hours"] || 0), 
+      0
+    );
+    
+    // Get hourly rate (custom or default based on role)
+    const hourlyRate = getRateForUser(user.id, user.role);
+    
+    // Calculate commission
+    const monthlyCommission = totalHours * hourlyRate;
+    
+    return {
+      ...user,
+      totalHours,
+      hourlyRate,
+      monthlyCommission,
+      taskCount: userCompletedTasks.length
+    };
+  });
+
+  // Filter by search query and selected role, then sort by monthly commission (descending)
+  const filteredUsers = usersWithStats
+    .filter(user => {
+      const matchesSearch = searchQuery === "" || 
+        user.name.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesStatus = selectedStatus === "all" || user.role === selectedStatus;
+      
       return matchesSearch && matchesStatus;
     })
-    .sort((a, b) => b.completedTasks - a.completedTasks);
+    .sort((a, b) => b.monthlyCommission - a.monthlyCommission);
 
-  // Calculate summary statistics
-  const totalTodoTasks = filteredUserStats.reduce((sum, user) => sum + user.todoTasks, 0);
-  const totalInProgressTasks = filteredUserStats.reduce((sum, user) => sum + user.inProgressTasks, 0);
-  const totalReviewTasks = filteredUserStats.reduce((sum, user) => sum + user.reviewTasks, 0);
-  const totalCompletedTasks = filteredUserStats.reduce((sum, user) => sum + user.completedTasks, 0);
-  const totalTasks = totalTodoTasks + totalInProgressTasks + totalReviewTasks + totalCompletedTasks;
-  const completionRate = totalTasks > 0 ? Math.round((totalCompletedTasks / totalTasks) * 100) : 0;
+  // Calculate total commission
+  const totalCommission = filteredUsers.reduce(
+    (sum, user) => sum + user.monthlyCommission, 
+    0
+  );
+
+  // Function to handle downloading the data as CSV
+  const handleDownload = () => {
+    // Create CSV header
+    const headers = ["NO", "Name", "Job Position", "Total Hours", "Rate ($/hour)", "Monthly Commission ($)"];
+    
+    // Map data to CSV rows
+    const csvData = filteredUsers.map((user, index) => [
+      index + 1,
+      user.name,
+      user.role,
+      user.totalHours.toFixed(1),
+      `$${user.hourlyRate.toFixed(2)}`,
+      `$${user.monthlyCommission.toFixed(2)}`
+    ]);
+    
+    // Add total row
+    csvData.push([
+      "",
+      "TOTAL",
+      "",
+      filteredUsers.reduce((sum, u) => sum + u.totalHours, 0).toFixed(1),
+      "",
+      `$${totalCommission.toFixed(2)}`
+    ]);
+    
+    // Combine headers and data
+    const csvContent = [
+      headers.join(","),
+      ...csvData.map(row => row.join(","))
+    ].join("\n");
+    
+    // Create download link
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    
+    // Set up download
+    const month = selectedMonth === "current" 
+      ? format(new Date(), "MMMM_yyyy") 
+      : selectedMonth.replace("-", "_");
+    
+    link.setAttribute("href", url);
+    link.setAttribute("download", `team_commission_${month}.csv`);
+    link.style.visibility = "hidden";
+    
+    // Trigger download
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   if (loading) {
     return (
@@ -239,14 +381,14 @@ export default function ReportsAnalyticsPage() {
                   <div className="w-2 bg-blue-500"></div>
                   <div className="p-6 flex-1">
                     <div className="flex items-center justify-between">
-                      <div className="text-sm font-medium text-gray-500">Total Tasks</div>
+                      <div className="text-sm font-medium text-gray-500">Total Staff</div>
                       <div className="p-2 bg-blue-50 rounded-full">
                         <PieChart className="h-5 w-5 text-blue-500" />
                       </div>
                     </div>
                     <div className="mt-4 flex items-end gap-2">
-                      <div className="text-3xl font-bold text-gray-900">{totalTasks}</div>
-                      <div className="text-sm text-gray-500 mb-1">assigned</div>
+                      <div className="text-3xl font-bold text-gray-900">{filteredUsers.length}</div>
+                      <div className="text-sm text-gray-500 mb-1">with completed tasks</div>
                     </div>
                   </div>
                 </div>
@@ -259,14 +401,16 @@ export default function ReportsAnalyticsPage() {
                   <div className="w-2 bg-green-500"></div>
                   <div className="p-6 flex-1">
                     <div className="flex items-center justify-between">
-                      <div className="text-sm font-medium text-gray-500">Completion Rate</div>
+                      <div className="text-sm font-medium text-gray-500">Total Hours</div>
                       <div className="p-2 bg-green-50 rounded-full">
                         <TrendingUp className="h-5 w-5 text-green-500" />
                       </div>
                     </div>
                     <div className="mt-4 flex items-end gap-2">
-                      <div className="text-3xl font-bold text-gray-900">{completionRate}%</div>
-                      <div className="text-sm text-gray-500 mb-1">efficiency</div>
+                      <div className="text-3xl font-bold text-gray-900">
+                        {filteredUsers.reduce((sum, u) => sum + u.totalHours, 0).toFixed(1)}
+                      </div>
+                      <div className="text-sm text-gray-500 mb-1">hours worked</div>
                     </div>
                   </div>
                 </div>
@@ -279,14 +423,18 @@ export default function ReportsAnalyticsPage() {
                   <div className="w-2 bg-purple-500"></div>
                   <div className="p-6 flex-1">
                     <div className="flex items-center justify-between">
-                      <div className="text-sm font-medium text-gray-500">Team Members</div>
+                      <div className="text-sm font-medium text-gray-500">Average Rate</div>
                       <div className="p-2 bg-purple-50 rounded-full">
                         <Users className="h-5 w-5 text-purple-500" />
                       </div>
                     </div>
                     <div className="mt-4 flex items-end gap-2">
-                      <div className="text-3xl font-bold text-gray-900">{filteredUserStats.length}</div>
-                      <div className="text-sm text-gray-500 mb-1">active users</div>
+                      <div className="text-3xl font-bold text-gray-900">
+                        ${filteredUsers.length > 0 
+                            ? (filteredUsers.reduce((sum, u) => sum + u.hourlyRate, 0) / filteredUsers.length).toFixed(2) 
+                            : "0.00"}
+                      </div>
+                      <div className="text-sm text-gray-500 mb-1">per hour</div>
                     </div>
                   </div>
                 </div>
@@ -299,91 +447,20 @@ export default function ReportsAnalyticsPage() {
                   <div className="w-2 bg-amber-500"></div>
                   <div className="p-6 flex-1">
                     <div className="flex items-center justify-between">
-                      <div className="text-sm font-medium text-gray-500">Completed Tasks</div>
+                      <div className="text-sm font-medium text-gray-500">Total Commission</div>
                       <div className="p-2 bg-amber-50 rounded-full">
                         <ClipboardCheck className="h-5 w-5 text-amber-500" />
                       </div>
                     </div>
                     <div className="mt-4 flex items-end gap-2">
-                      <div className="text-3xl font-bold text-gray-900">{totalCompletedTasks}</div>
-                      <div className="text-sm text-gray-500 mb-1">this period</div>
+                      <div className="text-3xl font-bold text-gray-900">${totalCommission.toFixed(2)}</div>
+                      <div className="text-sm text-gray-500 mb-1">this month</div>
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
-
-          {/* Status Distribution */}
-          <Card className="border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-all">
-            <CardHeader className="border-b border-gray-100 py-5 px-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-50 rounded-xl">
-                  <BarChart2 className="h-5 w-5 text-indigo-600" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg font-semibold text-gray-900">Task Status Distribution</CardTitle>
-                  <CardDescription className="text-sm text-gray-500">Current distribution of tasks by status</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-gray-50 rounded-xl p-5 flex flex-col items-center justify-center text-center">
-                  <div className="p-3 bg-gray-100 rounded-full mb-3">
-                    <ListTodo className="h-6 w-6 text-gray-600" />
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900">{totalTodoTasks}</div>
-                  <div className="text-sm font-medium text-gray-500 mt-1">To Do</div>
-                  <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-gray-600 h-2 rounded-full" 
-                      style={{ width: `${totalTasks > 0 ? (totalTodoTasks / totalTasks) * 100 : 0}%` }}
-                    ></div>
-                  </div>
-                </div>
-                <div className="bg-blue-50 rounded-xl p-5 flex flex-col items-center justify-center text-center">
-                  <div className="p-3 bg-blue-100 rounded-full mb-3">
-                    <Timer className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900">{totalInProgressTasks}</div>
-                  <div className="text-sm font-medium text-blue-600 mt-1">In Progress</div>
-                  <div className="mt-3 w-full bg-blue-200 rounded-full h-2">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full" 
-                      style={{ width: `${totalTasks > 0 ? (totalInProgressTasks / totalTasks) * 100 : 0}%` }}
-                    ></div>
-                  </div>
-                </div>
-                <div className="bg-amber-50 rounded-xl p-5 flex flex-col items-center justify-center text-center">
-                  <div className="p-3 bg-amber-100 rounded-full mb-3">
-                    <Eye className="h-6 w-6 text-amber-600" />
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900">{totalReviewTasks}</div>
-                  <div className="text-sm font-medium text-amber-600 mt-1">In Review</div>
-                  <div className="mt-3 w-full bg-amber-200 rounded-full h-2">
-                    <div 
-                      className="bg-amber-600 h-2 rounded-full" 
-                      style={{ width: `${totalTasks > 0 ? (totalReviewTasks / totalTasks) * 100 : 0}%` }}
-                    ></div>
-                  </div>
-                </div>
-                <div className="bg-green-50 rounded-xl p-5 flex flex-col items-center justify-center text-center">
-                  <div className="p-3 bg-green-100 rounded-full mb-3">
-                    <CheckCircle className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900">{totalCompletedTasks}</div>
-                  <div className="text-sm font-medium text-green-600 mt-1">Completed</div>
-                  <div className="mt-3 w-full bg-green-200 rounded-full h-2">
-                    <div 
-                      className="bg-green-600 h-2 rounded-full" 
-                      style={{ width: `${totalTasks > 0 ? (totalCompletedTasks / totalTasks) * 100 : 0}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-4">
@@ -392,7 +469,7 @@ export default function ReportsAnalyticsPage() {
                 <div className="relative">
                   <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
-                    placeholder="Search by username..."
+                    placeholder="Search by name..."
                     value={searchQuery}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                     className="pl-10 w-full bg-transparent border-gray-200 rounded-xl h-12 text-base focus:ring-2 focus:ring-blue-500/20 transition-all"
@@ -404,14 +481,92 @@ export default function ReportsAnalyticsPage() {
               <CardContent className="p-3">
                 <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                   <SelectTrigger className="w-[200px] bg-transparent border-gray-200 rounded-xl h-12">
-                    <SelectValue placeholder="Filter by status" />
+                    <SelectValue placeholder="Filter by role" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="To Do">To Do</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Review">Review</SelectItem>
-                    <SelectItem value="Completed">Completed</SelectItem>
+                  <SelectContent className="bg-white rounded-xl shadow-md p-2 border border-gray-100">
+                    <SelectItem 
+                      value="all" 
+                      className="cursor-pointer py-3 px-6 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
+                      {selectedStatus === "all" ? (
+                        <span className="text-blue-500 mr-2">✓</span>
+                      ) : (
+                        <span className="mr-2"></span>
+                      )}
+                      All Staff
+                    </SelectItem>
+                    <SelectItem 
+                      value="Translator" 
+                      className="cursor-pointer py-3 px-6 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
+                      {selectedStatus === "Translator" && <span className="text-blue-500 mr-2">✓</span>}
+                      Translators
+                    </SelectItem>
+                    <SelectItem 
+                      value="Voice-over Artist" 
+                      className="cursor-pointer py-3 px-6 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
+                      {selectedStatus === "Voice-over Artist" && <span className="text-blue-500 mr-2">✓</span>}
+                      Voice-over Artists
+                    </SelectItem>
+                    <SelectItem 
+                      value="Sound Engineer" 
+                      className="cursor-pointer py-3 px-6 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
+                      {selectedStatus === "Sound Engineer" && <span className="text-blue-500 mr-2">✓</span>}
+                      Sound Engineers
+                    </SelectItem>
+                    <SelectItem 
+                      value="Admin" 
+                      className="cursor-pointer py-3 px-6 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
+                      {selectedStatus === "Admin" && <span className="text-blue-500 mr-2">✓</span>}
+                      Admins
+                    </SelectItem>
+                    <SelectItem 
+                      value="Film Dubbing Team" 
+                      className="cursor-pointer py-3 px-6 rounded-lg hover:bg-blue-50 transition-colors"
+                    >
+                      {selectedStatus === "Film Dubbing Team" && <span className="text-blue-500 mr-2">✓</span>}
+                      Film Dubbing Team
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+            <Card className="border border-gray-100 shadow-sm">
+              <CardContent className="p-3">
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger className="w-[200px] bg-transparent border-gray-200 rounded-xl h-12">
+                    <div className="flex items-center">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      <SelectValue placeholder="Select month" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-white rounded-xl shadow-md p-2 border border-gray-100">
+                    {monthOptions.map(option => (
+                      <SelectItem 
+                        key={option.value} 
+                        value={option.value}
+                        className="cursor-pointer py-3 px-6 rounded-lg hover:bg-blue-50 transition-colors"
+                      >
+                        {option.value === selectedMonth ? (
+                          <span className="text-blue-500 mr-2">✓</span>
+                        ) : (
+                          <span className="mr-2">{option.value === "current" ? "✓" : ""}</span>
+                        )}
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                    <div className="px-2 py-3">
+                      <button 
+                        onClick={handleDownload}
+                        className="w-full text-center text-blue-600 py-3 px-6 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer flex items-center justify-center"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download CSV
+                      </button>
+                    </div>
                   </SelectContent>
                 </Select>
               </CardContent>
@@ -421,14 +576,28 @@ export default function ReportsAnalyticsPage() {
           {/* User Task Summary Table */}
           <Card className="border border-gray-100 bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow transition-all">
             <CardHeader className="border-b border-gray-100 py-5 px-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-50 rounded-xl">
-                  <Users className="h-5 w-5 text-blue-600" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-50 rounded-xl">
+                    <Users className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg font-semibold">Team Compensation Summary</CardTitle>
+                    <CardDescription className="text-sm text-gray-500">
+                      {selectedMonth === "current" 
+                        ? "Current month - Staff with completed tasks" 
+                        : `${monthOptions.find(m => m.value === selectedMonth)?.label} - Staff with completed tasks`}
+                    </CardDescription>
+                  </div>
                 </div>
-                <div>
-                  <CardTitle className="text-lg font-semibold">User Task Summary</CardTitle>
-                  <CardDescription className="text-sm text-gray-500">Overview of tasks by user</CardDescription>
-                </div>
+                <Button 
+                  onClick={handleDownload}
+                  variant="outline" 
+                  className="px-4 py-2 border-blue-200 text-blue-600 hover:bg-blue-50 rounded-lg"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download CSV
+                </Button>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -436,45 +605,17 @@ export default function ReportsAnalyticsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
-                      <TableHead className="w-12 font-semibold text-gray-600">#</TableHead>
-                      <TableHead className="font-semibold text-gray-600">User</TableHead>
-                      <TableHead className="font-semibold text-gray-600">
-                        <div className="flex items-center gap-2">
-                          <div className="p-1 bg-gray-100 rounded">
-                            <ListTodo className="h-3.5 w-3.5 text-gray-500" />
-                          </div>
-                          To Do
-                        </div>
-                      </TableHead>
-                      <TableHead className="font-semibold text-gray-600">
-                        <div className="flex items-center gap-2">
-                          <div className="p-1 bg-blue-100 rounded">
-                            <Timer className="h-3.5 w-3.5 text-blue-500" />
-                          </div>
-                          In Progress
-                        </div>
-                      </TableHead>
-                      <TableHead className="font-semibold text-gray-600">
-                        <div className="flex items-center gap-2">
-                          <div className="p-1 bg-yellow-100 rounded">
-                            <Eye className="h-3.5 w-3.5 text-yellow-500" />
-                          </div>
-                          Review
-                        </div>
-                      </TableHead>
-                      <TableHead className="font-semibold text-gray-600">
-                        <div className="flex items-center gap-2">
-                          <div className="p-1 bg-green-100 rounded">
-                            <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-                          </div>
-                          Completed
-                        </div>
-                      </TableHead>
+                      <TableHead className="w-12 font-semibold text-gray-600">NO</TableHead>
+                      <TableHead className="font-semibold text-gray-600">Name</TableHead>
+                      <TableHead className="font-semibold text-gray-600">Job Position</TableHead>
+                      <TableHead className="font-semibold text-gray-600">Total Hours</TableHead>
+                      <TableHead className="font-semibold text-gray-600">Rate ($/hour)</TableHead>
+                      <TableHead className="font-semibold text-gray-600">Monthly Commission ($)</TableHead>
                       <TableHead className="font-semibold text-gray-600 text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredUserStats.length === 0 ? (
+                    {filteredUsers.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center py-16 bg-gray-50/20">
                           <div className="flex flex-col items-center gap-4">
@@ -482,55 +623,64 @@ export default function ReportsAnalyticsPage() {
                               <Users className="h-8 w-8 text-gray-400" />
                             </div>
                             <div className="space-y-1 text-center">
-                              <p className="text-lg font-medium text-gray-600">No users found</p>
-                              <p className="text-sm text-gray-500">Try adjusting your filters</p>
+                              <p className="text-lg font-medium text-gray-600">No staff found</p>
+                              <p className="text-sm text-gray-500">No users with completed tasks match your filters</p>
                             </div>
                           </div>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredUserStats.map((user, index) => (
-                        <TableRow 
-                          key={user.id} 
-                          className="hover:bg-blue-50/5 transition-colors duration-150 group border-b border-gray-100 last:border-0"
-                        >
-                          <TableCell className="font-medium text-gray-600">
-                            {index + 1}
-                          </TableCell>
+                      filteredUsers.map((user, index) => (
+                        <TableRow key={user.id} className="hover:bg-blue-50/5 transition-colors duration-150 group border-b border-gray-100">
+                          <TableCell className="font-medium text-gray-600">{index + 1}</TableCell>
+                          <TableCell>{user.name}</TableCell>
+                          <TableCell>{user.role}</TableCell>
+                          <TableCell>{user.totalHours.toFixed(1)}</TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-3">
-                              <Avatar className="h-10 w-10 border-2 border-white shadow-sm group-hover:shadow-md transition-shadow">
-                                <AvatarImage src={user.profile_image} />
-                                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-medium">
-                                  {user.username[0].toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <div className="font-medium text-gray-900">{user.username}</div>
-                                <div className="text-xs text-gray-500">User #{user.id}</div>
+                            {editingUserId === user.id ? (
+                              <div className="flex items-center gap-2">
+                                <div className="relative">
+                                  <Input
+                                    type="number"
+                                    value={editingRate}
+                                    onChange={(e) => setEditingRate(Number(e.target.value))}
+                                    className="w-24 py-1 px-2 text-sm"
+                                    step="0.01"
+                                    min="0"
+                                  />
+                                </div>
+                                <Button 
+                                  onClick={() => saveRate(user.id)} 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-6 w-6 rounded-full p-0 hover:bg-green-100"
+                                >
+                                  <Check className="h-3.5 w-3.5 text-green-500" />
+                                </Button>
+                                <Button 
+                                  onClick={cancelEditing} 
+                                  variant="ghost" 
+                                  size="icon"
+                                  className="h-6 w-6 rounded-full p-0 hover:bg-red-100"
+                                >
+                                  <X className="h-3.5 w-3.5 text-red-500" />
+                                </Button>
                               </div>
-                            </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span>US$ {user.hourlyRate.toFixed(2)}</span>
+                                <Button
+                                  onClick={() => startEditingRate(user.id, user.hourlyRate)}
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 rounded-full p-0 hover:bg-blue-100"
+                                >
+                                  <Edit className="h-3.5 w-3.5 text-blue-500" />
+                                </Button>
+                              </div>
+                            )}
                           </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="px-4 py-1.5 bg-white font-medium border-gray-200 shadow-sm hover:shadow transition-shadow rounded-full">
-                              {user.todoTasks}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="px-4 py-1.5 bg-white font-medium border-blue-200 shadow-sm hover:shadow transition-shadow rounded-full">
-                              {user.inProgressTasks}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="px-4 py-1.5 bg-white font-medium border-yellow-200 shadow-sm hover:shadow transition-shadow rounded-full">
-                              {user.reviewTasks}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="px-4 py-1.5 bg-white font-medium border-green-200 shadow-sm hover:shadow transition-shadow rounded-full">
-                              {user.completedTasks}
-                            </Badge>
-                          </TableCell>
+                          <TableCell>US$ {user.monthlyCommission.toFixed(2)}</TableCell>
                           <TableCell className="text-right">
                             <Link href={`/Admin/Reports-Analytics/${user.id}`}>
                               <button 
@@ -544,10 +694,28 @@ export default function ReportsAnalyticsPage() {
                         </TableRow>
                       ))
                     )}
+                    
+                    {filteredUsers.length > 0 && (
+                      <TableRow className="bg-gray-50/50 font-medium border-t-2 border-gray-200">
+                        <TableCell colSpan={5} className="text-right pr-4 font-bold text-gray-700">
+                          Total Monthly Commission:
+                        </TableCell>
+                        <TableCell className="font-bold">
+                          US$ {totalCommission.toFixed(2)}
+                        </TableCell>
+                        <TableCell></TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>
             </CardContent>
+            <CardFooter className="bg-gray-50 py-3 px-6 text-xs text-gray-500">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-3.5 w-3.5" />
+                <span>Click the edit icon next to any rate to adjust the hourly rate for that employee.</span>
+              </div>
+            </CardFooter>
           </Card>
         </div>
       </div>

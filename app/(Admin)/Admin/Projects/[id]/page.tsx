@@ -168,6 +168,18 @@ const getFirstFileUrl = (fileUrl: string | null | undefined) => {
   return urls.length > 0 ? urls[0] : undefined;
 };
 
+// Add this helper function after the existing helper functions
+const simpleDateFormat = (dateString: string) => {
+  if (!dateString) return "Unknown";
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    return date.toISOString().split('T')[0]; // Returns YYYY-MM-DD format
+  } catch (error) {
+    return dateString;
+  }
+};
+
 export default function ProjectDetail({ params }: { params: any }) {
   const router = useRouter();
    const paramsObj = React.use(params) as { id: string };
@@ -235,7 +247,7 @@ export default function ProjectDetail({ params }: { params: any }) {
 
    const fetchUsers = async () => {
     try {
-      const response = await axios.get('http://localhost:8001/api/auth/users');
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_USER_SERVICE_URL}/api/auth/users`);
 
        const users = response.data.users || response.data;
       
@@ -263,7 +275,7 @@ export default function ProjectDetail({ params }: { params: any }) {
       try {
         setLoading(true);
         const response = await axios.get(
-          `http://localhost:8002/api/project/singleProject/${id}`
+          `${process.env.NEXT_PUBLIC_PROJECT_SERVICE_URL}/api/project/singleProject/${id}`
         );
 
         if (response.data.success) {
@@ -294,9 +306,7 @@ export default function ProjectDetail({ params }: { params: any }) {
 
    const fetchTasks = async (projectId: string) => {
     try {
-      const response = await axios.get(
-        `http://localhost:8003/api/task/projectTasks/${projectId}`
-      );
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_TASK_SERVICE_URL}/api/task/projectTasks/${projectId}`);
 
       if (response.data.success) {
          const tasksFromApi = response.data.tasks ? response.data.tasks.map((task: any) => ({
@@ -359,7 +369,7 @@ export default function ProjectDetail({ params }: { params: any }) {
   const fetchChatMessages = async (projectId: any) => {
     try {
       setLoadingChat(true);
-      const response = await axios.get(`http://localhost:8006/api/chat/${projectId}`);
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_CHAT_SERVICE_URL}/api/chat/${projectId}`);
       
       if (response.data && Array.isArray(response.data.messages)) {
         setChatMessages(response.data.messages);
@@ -400,7 +410,7 @@ export default function ProjectDetail({ params }: { params: any }) {
       }
       
       const response = await axios.post(
-        "http://localhost:8006/api/chat/send",
+        `${process.env.NEXT_PUBLIC_CHAT_SERVICE_URL}/api/chat/send`,
         formData,
         {
           headers: {
@@ -596,7 +606,7 @@ export default function ProjectDetail({ params }: { params: any }) {
                           onChange={(e) =>
                             setNewTask({ ...newTask, title: e.target.value })
                           }
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff4e00] focus:border-transparent"
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
                           placeholder="Enter task title"
                           required
                         />
@@ -613,7 +623,7 @@ export default function ProjectDetail({ params }: { params: any }) {
                               description: e.target.value,
                             })
                           }
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff4e00] focus:border-transparent"
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
                           placeholder="Enter task description"
                           rows={4}
                         />
@@ -635,7 +645,7 @@ export default function ProjectDetail({ params }: { params: any }) {
                                   | "Completed",
                               })
                             }
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff4e00] focus:border-transparent"
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
                           >
                             <option value="To Do">To Do</option>
                             <option value="In Progress">In Progress</option>
@@ -659,7 +669,7 @@ export default function ProjectDetail({ params }: { params: any }) {
                                   | "Critical",
                               })
                             }
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff4e00] focus:border-transparent"
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
                           >
                             <option value="Low">Low</option>
                             <option value="Medium">Medium</option>
@@ -682,7 +692,7 @@ export default function ProjectDetail({ params }: { params: any }) {
                                 deadline: e.target.value,
                               })
                             }
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff4e00] focus:border-transparent"
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
                           />
                         </div>
                         <div>
@@ -699,7 +709,7 @@ export default function ProjectDetail({ params }: { params: any }) {
                                 estimated_hours: parseInt(e.target.value) || 0,
                               })
                             }
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ff4e00] focus:border-transparent"
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-transparent"
                             placeholder="Enter estimated hours"
                           />
                         </div>
@@ -778,8 +788,9 @@ export default function ProjectDetail({ params }: { params: any }) {
                               }
 
                               // Send request to create task
+                              const api_url = `${process.env.NEXT_PUBLIC_TASK_SERVICE_URL}/api/task/addTask`;
                               const response = await axios.post(
-                                "http://localhost:8003/api/task/addTask",
+                                api_url,
                                 formData,
                                 {
                                   headers: {
@@ -917,7 +928,7 @@ export default function ProjectDetail({ params }: { params: any }) {
                                 <div className="flex items-center">
                                   <FiCalendar className="mr-2" size={12} />
                                   <span className="mr-1 font-medium">Deadline:</span> 
-                                  <span>{formatDate(task.deadline)}</span>
+                                  <span>{simpleDateFormat(task.deadline)}</span>
                                 </div>
                                 
                                 {/* Attachment indicator */}
@@ -965,7 +976,7 @@ export default function ProjectDetail({ params }: { params: any }) {
                                     onClick={() => {
                                       if (confirm("Are you sure you want to delete this task?")) {
                                         setDeletingTaskId(task.id);
-                                        axios.delete(`http://localhost:8003/api/task/deleteSingleTask/${task.id}`)
+                                        axios.delete(`${process.env.NEXT_PUBLIC_TASK_SERVICE_URL}/api/task/deleteSingleTask/${task.id}`)
                                           .then(response => {
                                             if (response.status === 200) {
                                               toast.success("Task deleted successfully");
@@ -1051,7 +1062,7 @@ export default function ProjectDetail({ params }: { params: any }) {
                                 <div className="flex items-center">
                                   <FiCalendar className="mr-2" size={12} />
                                   <span className="mr-1 font-medium">Deadline:</span> 
-                                  <span>{formatDate(task.deadline)}</span>
+                                  <span>{simpleDateFormat(task.deadline)}</span>
                                 </div>
                                 
                                 {/* Attachment indicator */}
@@ -1099,7 +1110,7 @@ export default function ProjectDetail({ params }: { params: any }) {
                                     onClick={() => {
                                       if (confirm("Are you sure you want to delete this task?")) {
                                         setDeletingTaskId(task.id);
-                                        axios.delete(`http://localhost:8003/api/task/deleteSingleTask/${task.id}`)
+                                        axios.delete(`${process.env.NEXT_PUBLIC_TASK_SERVICE_URL}/api/task/deleteSingleTask/${task.id}`)
                                           .then(response => {
                                             if (response.status === 200) {
                                               toast.success("Task deleted successfully");
@@ -1185,7 +1196,7 @@ export default function ProjectDetail({ params }: { params: any }) {
                                 <div className="flex items-center">
                                   <FiCalendar className="mr-2" size={12} />
                                   <span className="mr-1 font-medium">Deadline:</span> 
-                                  <span>{formatDate(task.deadline)}</span>
+                                  <span>{simpleDateFormat(task.deadline)}</span>
                                 </div>
                                 
                                 {/* Attachment indicator */}
@@ -1233,7 +1244,7 @@ export default function ProjectDetail({ params }: { params: any }) {
                                     onClick={() => {
                                       if (confirm("Are you sure you want to delete this task?")) {
                                         setDeletingTaskId(task.id);
-                                        axios.delete(`http://localhost:8003/api/task/deleteSingleTask/${task.id}`)
+                                        axios.delete(`${process.env.NEXT_PUBLIC_TASK_SERVICE_URL}/api/task/deleteSingleTask/${task.id}`)
                                           .then(response => {
                                             if (response.status === 200) {
                                               toast.success("Task deleted successfully");
@@ -1319,7 +1330,7 @@ export default function ProjectDetail({ params }: { params: any }) {
                                 <div className="flex items-center">
                                   <FiCalendar className="mr-2" size={12} />
                                   <span className="mr-1 font-medium">Deadline:</span> 
-                                  <span>{formatDate(task.deadline)}</span>
+                                  <span>{simpleDateFormat(task.deadline)}</span>
                                 </div>
                                 
                                 {/* Attachment indicator */}
@@ -1367,7 +1378,7 @@ export default function ProjectDetail({ params }: { params: any }) {
                                     onClick={() => {
                                       if (confirm("Are you sure you want to delete this task?")) {
                                         setDeletingTaskId(task.id);
-                                        axios.delete(`http://localhost:8003/api/task/deleteSingleTask/${task.id}`)
+                                        axios.delete(`${process.env.NEXT_PUBLIC_TASK_SERVICE_URL}/api/task/deleteSingleTask/${task.id}`)
                                           .then(response => {
                                             if (response.status === 200) {
                                               toast.success("Task deleted successfully");
@@ -1968,8 +1979,9 @@ export default function ProjectDetail({ params }: { params: any }) {
                     }
 
                     // Send request to update task
+                    const api_url = `${process.env.NEXT_PUBLIC_TASK_SERVICE_URL}/api/task/updateTask/${editingTaskId}`;
                     const response = await axios.put(
-                      `http://localhost:8003/api/task/updateTask/${editingTaskId}`,
+                      api_url,
                       formData,
                       {
                         headers: {

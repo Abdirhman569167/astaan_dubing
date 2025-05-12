@@ -41,8 +41,6 @@ export default function MyTasksPage() {
   const [selectedTask, setSelectedTask] = useState<TaskStatusUpdate | null>(null);
   const [showModal, setShowModal] = useState(false);
 
-  const taskUrl = process.env.NEXT_PUBLIC_TASK_SERVICE_URL;
-
   useEffect(() => {
     if (user?.id) {
       fetchTasks();
@@ -55,7 +53,7 @@ export default function MyTasksPage() {
 
   const fetchTasks = async () => {
     try {
-      const response = await fetch(`${taskUrl}/api/task-assignment/allTaskStatusUpdates`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_TASK_SERVICE_URL}/api/task-assignment/allTaskStatusUpdates`);
       const data = await response.json();
       if (data.success) {
          const userCompletedTasks = data.statusUpdates.filter((task: TaskStatusUpdate) => 

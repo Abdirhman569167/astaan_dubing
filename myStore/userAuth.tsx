@@ -29,7 +29,7 @@ const userAuth = create<UserAuthState>()(
     }),
     {
       name: "Astan-storage", 
-      getStorage: () => localStorage,  
+      getStorage:  () => localStorage,  
     }
   )
 );

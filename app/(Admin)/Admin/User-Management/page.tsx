@@ -138,6 +138,14 @@ const userRoles = [
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="border-b border-gray-100 pb-3">
+                  <p className="text-sm text-gray-500 font-medium mb-1">Employee ID</p>
+                  <p className="font-medium flex items-center">
+                    <span className="mr-2 text-[#ff4e00]">🆔</span>
+                    {user.employee_id || "—"}
+                  </p>
+                </div>
+                
+                <div className="border-b border-gray-100 pb-3">
                   <p className="text-sm text-gray-500 font-medium mb-1">Email</p>
                   <p className="font-medium flex items-center">
                     <span className="mr-2 text-[#ff4e00]">📧</span>
@@ -205,7 +213,7 @@ export default function UsersPage() {
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const userService = process.env.NEXT_PUBLIC_USER_SERVICE_URL;
+//  const userService = process.env.NEXT_PUBLIC_USER_SERVICE_URL;
 
   const getUsers = async () => {
     try {
@@ -217,6 +225,7 @@ export default function UsersPage() {
           name: user.name,
           email: user.email,
           phone: user.mobile || "N/A",
+          employee_id: user.employee_id || "",
           role: user.role,
           status: "Active",  
           avatar: user.profile_image,
@@ -244,7 +253,8 @@ export default function UsersPage() {
   const filteredUsers = userList.filter((user: any) => {
     const matchesSearch =
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase());
+      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (user.employee_id && user.employee_id.toLowerCase().includes(searchQuery.toLowerCase()));
 
     let matchesTab = true;
     if (selectedTab !== "all") {
@@ -324,6 +334,7 @@ export default function UsersPage() {
     const [name, setName] = useState(user.name);
     const [email, setEmail] = useState(user.email);
     const [phone, setPhone] = useState(user.phone);
+    const [employeeId, setEmployeeId] = useState(user.employee_id || "");
     const [role, setRole] = useState(user.role);
     const [previewImage, setPreviewImage] = useState(user.avatar);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -358,13 +369,11 @@ export default function UsersPage() {
         
         const formData = new FormData();
   
-        if(name) formData.append('name', name);
-  
-        if(email) formData.append('email', email);
-  
-        if(phone) formData.append('mobile', phone);
-  
-        if(role) formData.append('role', role);
+        formData.append('name', name);
+        formData.append('email', email);
+        formData.append('mobile', phone);
+        formData.append('employee_id', employeeId);
+        formData.append('role', role);
         
         if(selectedFile) formData.append('profileImage', selectedFile);
   
@@ -474,6 +483,18 @@ export default function UsersPage() {
                   </div>
                   
                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
+                    <input
+                      type="text"
+                      name="employee_id"
+                      value={employeeId}
+                      onChange={(e) => setEmployeeId(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2"
+                      placeholder="Enter employee ID"
+                    />
+                  </div>
+                  
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
                     <input
                       type="text"
@@ -542,6 +563,7 @@ export default function UsersPage() {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
+    const [employeeId, setEmployeeId] = useState("");
     const [role, setRole] = useState("User");
     const [password, setPassword] = useState("");
     const [previewImage, setPreviewImage] = useState("");
@@ -579,7 +601,7 @@ export default function UsersPage() {
         return;
       }
       
-       const trimmedPhone = phone.trim();
+      const trimmedPhone = phone.trim();
       
       try {
         setLoading(true);
@@ -589,13 +611,14 @@ export default function UsersPage() {
         formData.append('name', name);
         formData.append('email', email);
         formData.append('mobile', trimmedPhone);
+        formData.append('employee_id', employeeId);
         formData.append('role', role);
         formData.append('password', password);
         if(selectedFile) formData.append('profileImage', selectedFile);
 
         const response = await Authentication.createUser(formData);
         
-         if (response.status === 201 || (response.data && response.data.success)) {
+        if (response.status === 201 || (response.data && response.data.success)) {
           toast.success(response.data.message || "User created successfully");
           getUsers();
           onClose();
@@ -697,6 +720,18 @@ export default function UsersPage() {
                 </div>
                 
                 <div className="flex-1 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID</label>
+                    <input
+                      type="text"
+                      name="employee_id"
+                      value={employeeId}
+                      onChange={(e) => setEmployeeId(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2"
+                      placeholder="Enter employee ID"
+                    />
+                  </div>
+                  
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
                     <input
@@ -948,7 +983,10 @@ export default function UsersPage() {
                       Contact Info
                     </th>
                     <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Role & Status
+                      Role
+                    </th>
+                    <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Employee ID
                     </th>
                     <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Joined Date
@@ -1011,11 +1049,12 @@ export default function UsersPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex flex-col gap-2">
-                            <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getRoleColor(user.role)}`}>
-                              {user.role}
-                            </span>
-                          </div>
+                          <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getRoleColor(user.role)}`}>
+                            {user.role}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">{user.employee_id || "—"}</div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-900">{user.joinDate}</div>

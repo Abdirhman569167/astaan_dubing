@@ -12,6 +12,7 @@ import {
   FiInfo,
   FiAlertTriangle,
   FiCalendar,
+  FiLayers,
 } from 'react-icons/fi';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
@@ -37,13 +38,15 @@ export default function AdminDashboard() {
     inProgressTasks: 0,
     reviewTasks: 0,
     totalTasks: 0,
+    totalProjects: 0,
     weeklyChanges: {
       users: 0,
       completed: 0,
       todo: 0,
       inProgress: 0,
       review: 0,
-      total: 0
+      total: 0,
+      projects: 0
     }
   });
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -58,9 +61,9 @@ export default function AdminDashboard() {
   const [newNotificationsCount, setNewNotificationsCount] = useState(0);
 
   // Update API endpoints to match what you've provided
-  const userServiceUrl = 'http://localhost:8001';
-  const projectServiceUrl = 'http://localhost:8002';
-  const taskServiceUrl = 'http://localhost:8003';
+  const userServiceUrl = process.env.NEXT_PUBLIC_USER_SERVICE_URL;
+  const projectServiceUrl = process.env.NEXT_PUBLIC_PROJECT_SERVICE_URL;
+  const taskServiceUrl = process.env.NEXT_PUBLIC_TASK_SERVICE_URL;
 
   // Helper function to safely format dates and handle invalid dates
   const formatDate = (dateStr: string | undefined | null) => {
@@ -117,7 +120,8 @@ export default function AdminDashboard() {
           todo: -2,
           inProgress: -3,
           review: 0,
-          total: 18
+          total: 18,
+          projects: 5
         };
 
         setStats({
@@ -127,6 +131,7 @@ export default function AdminDashboard() {
           inProgressTasks,
           reviewTasks,
           totalTasks,
+          totalProjects: projects.length || 0,
           weeklyChanges
         });
 
@@ -404,11 +409,25 @@ export default function AdminDashboard() {
                 <h3 className="text-gray-500 text-sm font-medium">Total Users</h3>
                 <p className="text-3xl font-bold mt-2">{stats.totalUsers}</p>
                 <p className={`text-sm mt-2 ${getChangeColor(stats.weeklyChanges.users)}`}>
-                  {stats.weeklyChanges.users > 0 ? '+' : ''}{stats.weeklyChanges.users} this week
                 </p>
               </div>
               <div className="bg-blue-100 p-3 rounded-full">
                 <FiUsers className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Total Projects */}
+          <div className="bg-white rounded-xl p-6 shadow-sm">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-gray-500 text-sm font-medium">Total Projects</h3>
+                <p className="text-3xl font-bold mt-2">{stats.totalProjects}</p>
+                <p className={`text-sm mt-2 ${getChangeColor(stats.weeklyChanges.projects)}`}>
+                </p>
+              </div>
+              <div className="bg-indigo-100 p-3 rounded-full">
+                <FiLayers className="h-6 w-6 text-indigo-600" />
               </div>
             </div>
           </div>
@@ -420,75 +439,10 @@ export default function AdminDashboard() {
                 <h3 className="text-gray-500 text-sm font-medium">Total Tasks</h3>
                 <p className="text-3xl font-bold mt-2">{stats.totalTasks}</p>
                 <p className={`text-sm mt-2 ${getChangeColor(stats.weeklyChanges.total)}`}>
-                  {stats.weeklyChanges.total > 0 ? '+' : ''}{stats.weeklyChanges.total} this week
                 </p>
               </div>
               <div className="bg-purple-100 p-3 rounded-full">
                 <FiCalendar className="h-6 w-6 text-purple-600" />
-              </div>
-            </div>
-          </div>
-
-          {/* To Do Tasks */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-gray-500 text-sm font-medium">To Do Tasks</h3>
-                <p className="text-3xl font-bold mt-2">{stats.todoTasks}</p>
-                <p className={`text-sm mt-2 ${getChangeColor(stats.weeklyChanges.todo)}`}>
-                  {stats.weeklyChanges.todo > 0 ? '+' : ''}{stats.weeklyChanges.todo} this week
-                </p>
-              </div>
-              <div className="bg-gray-100 p-3 rounded-full">
-                <FiClock className="h-6 w-6 text-gray-600" />
-              </div>
-            </div>
-          </div>
-
-          {/* In Progress Tasks */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-gray-500 text-sm font-medium">In Progress Tasks</h3>
-                <p className="text-3xl font-bold mt-2">{stats.inProgressTasks}</p>
-                <p className={`text-sm mt-2 ${getChangeColor(stats.weeklyChanges.inProgress)}`}>
-                  {stats.weeklyChanges.inProgress > 0 ? '+' : ''}{stats.weeklyChanges.inProgress} this week
-                </p>
-              </div>
-              <div className="bg-blue-100 p-3 rounded-full">
-                <FiClock className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-          </div>
-
-          {/* Review Tasks */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-gray-500 text-sm font-medium">Under Review Tasks</h3>
-                <p className="text-3xl font-bold mt-2">{stats.reviewTasks}</p>
-                <p className={`text-sm mt-2 ${getChangeColor(stats.weeklyChanges.review)}`}>
-                  {stats.weeklyChanges.review > 0 ? '+' : ''}{stats.weeklyChanges.review} this week
-                </p>
-              </div>
-              <div className="bg-yellow-100 p-3 rounded-full">
-                <FiAlertCircle className="h-6 w-6 text-yellow-600" />
-              </div>
-            </div>
-          </div>
-
-          {/* Completed Tasks */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-gray-500 text-sm font-medium">Completed Tasks</h3>
-                <p className="text-3xl font-bold mt-2">{stats.completedTasks}</p>
-                <p className={`text-sm mt-2 ${getChangeColor(stats.weeklyChanges.completed)}`}>
-                  {stats.weeklyChanges.completed > 0 ? '+' : ''}{stats.weeklyChanges.completed} this week
-                </p>
-              </div>
-              <div className="bg-green-100 p-3 rounded-full">
-                <FiCheckCircle className="h-6 w-6 text-green-600" />
               </div>
             </div>
           </div>

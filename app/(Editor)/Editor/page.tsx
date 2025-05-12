@@ -43,8 +43,6 @@ export default function EditorPage() {
     overdue: 0
   });
 
-  const taskUrl = process.env.NEXT_PUBLIC_TASK_SERVICE_URL;
-
   useEffect(() => {
     if (user?.id) {
       fetchTasks();
@@ -53,7 +51,7 @@ export default function EditorPage() {
 
   const fetchTasks = async () => {
     try {
-      const response = await fetch(`${taskUrl}/api/task-assignment/allTaskStatusUpdates`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_TASK_SERVICE_URL}/api/task-assignment/allTaskStatusUpdates`);
       const data = await response.json();
       if (data.success) {
          const userTasks = data.statusUpdates.filter((task: TaskStatusUpdate) => 

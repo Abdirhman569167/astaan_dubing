@@ -3,10 +3,10 @@ import axios from "axios";
 const userService = process.env.NEXT_PUBLIC_USER_SERVICE_URL;
 
 const Authentication = {
-  login: async (email, password) => {
+  login: async (identifier, password) => {
     return await axios.post(
       `${userService}/api/auth/login`,
-      { email, password },
+      { identifier, password },
       { withCredentials: true }
     );
   },
